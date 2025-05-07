@@ -110,7 +110,7 @@ class TextPreprocessor:
         return self.word_to_index
 def dataPipeline(df):
     df = dataCleaningPipeline(df)
-    with open('offensive_en.txt') as f:
+    with open('../artifacts/offensive_en.txt') as f:
         offensive_words = set(word.strip() for word in f)
     df["text"] = df["text"].apply(lambda x: saveBadWords(x, offensive_words=offensive_words))
 
