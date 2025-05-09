@@ -5,5 +5,5 @@ nixPkgs = ['python39']
 cmds = ['python -m venv /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt']
 
 [start]
-cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "fastapi dev app/main.py"
 
