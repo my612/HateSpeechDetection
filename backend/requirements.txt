@@ -2,7 +2,7 @@ torch==2.7.0
 fastapi==0.115.12
 uvicorn==0.34.2
 pydantic==2.11.4
-spacy==3.8.5
+spacy==3.7.1
 beautifulsoup4==4.13.4
 contractions==0.1.73
 tqdm==4.67.1
