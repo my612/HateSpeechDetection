@@ -9,9 +9,15 @@ from collections import Counter
 import pickle
 import spacy.cli
 from tqdm import tqdm
+import os
 
-# ----- Load static resources ONCE
-with open("../artifacts/offensive_en.txt") as f:
+# Get the current file's directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct path to artifacts
+artifacts_path = os.path.join(os.path.dirname(current_dir), "artifacts", "offensive_en.txt")
+
+# Use the path
+with open(artifacts_path) as f:
     offensive_words = set(word.strip() for word in f)
 
 # You do NOT need to load vocab.pkl here unless you're doing inference.
