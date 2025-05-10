@@ -1,12 +1,12 @@
 {
-    "vocab_size": 163588,
+    "vocab_size": 42580,
     "embed_dim": 128,
     "hid_dim": 512,
-    "lr": 0.00025456124617920527,
-    "batch_size": 32,
-    "num_epochs": 5,
+    "lr": 0.000816845589476017,
+    "batch_size": 64,
+    "num_epochs": 7,
     "max_seq_length": 100,
     "pad_idx": 0,
-    "gamma": 2.0,
-    "alpha": 0.8082413504357863
+    "gamma": 1.0,
+    "alpha": 0.9179706403942524
 }

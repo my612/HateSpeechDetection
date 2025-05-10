@@ -33,12 +33,14 @@ BASE_DIR = Path(__file__).parent.parent
 MODEL_WEIGHTS = BASE_DIR / "artifacts/hate_speech_model-nn-focal.pth"
 VOCAB_PATH    = BASE_DIR / "artifacts/vocab.pkl"
 HYPERPARAMS   = BASE_DIR / "artifacts/best_hyperparams-nn-focal.json"
-
+BEST_THRESHOLD = BASE_DIR / "artifacts/hate_speech_model_bestthr.json"
 # Hyperparameters needed for model instantiation
 with open(HYPERPARAMS, "r") as f:
     params = json.load(f)
 with open(VOCAB_PATH, "rb") as f:
     word_to_index = pickle.load(f)
+with open(BEST_THRESHOLD, "r") as f:
+    threshold = json.load(f)
 
 # Model instantiation (match code train args order)
 def get_model():
@@ -72,7 +74,7 @@ def predict_from_tensor(input_tensor):
     with torch.no_grad():
         logits = model(input_tensor)
         prob = torch.sigmoid(logits).item()  # scalar
-        label = prob >= 0.5
+        label = prob >= threshold["best_threshold"] 
     return label, prob
 #%%
 test_case = "Islam and ISIS should go to hell. All Muslims should be immediately sent to their country, because they are all intolerant criminals. If we do so, Britain will be a safer place."
