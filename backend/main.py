@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.model import predict
+from app.model import predict, explain
 from pydantic import BaseModel
 from typing import List
 import logging
@@ -69,6 +69,9 @@ async def health_check():
 
 if __name__ == "__main__":
 
+    # test_case = "Islam and ISIS should go to hell. All Muslims should be immediately sent to their country, because they are all intolerant criminals. If we do so, Britain will be a safer place."
+
+    # print(explain(test_case))
     port = int(os.getenv("PORT", 8000))
 
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
