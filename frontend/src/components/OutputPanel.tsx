@@ -1,69 +1,245 @@
+
 import React from 'react';
-import { PredictionSummary } from './PredictionSummary';
-import { TextHighlighter } from './TextHighlighter';
-import { AttributionBreakdown } from './AttributionBreakdown';
-import { Loader2Icon } from 'lucide-react';
-export const OutputPanel = ({
-  analysisResult,
-  isAnalyzing
+import { Check, AlertTriangle, Info, X } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { AttributionToken, PredictionResponse, PredictionResult } from '@/types';
+
+interface OutputPanelProps {
+  prediction: PredictionResponse | null;
+  predictionResult: PredictionResult;
+  onProvideFeedback: (isCorrect: boolean) => void;
+  onSkipFeedback: () => void;
+  feedbackSubmitted: boolean;
+}
+
+const OutputPanel: React.FC<OutputPanelProps> = ({
+  prediction,
+  predictionResult,
+  onProvideFeedback,
+  onSkipFeedback,
+  feedbackSubmitted
 }) => {
-  if (isAnalyzing) {
-    return <div className="bg-white p-6 rounded-lg shadow-md h-full flex flex-col items-center justify-center">
-        <Loader2Icon className="h-12 w-12 text-blue-500 animate-spin mb-4" />
-        <p className="text-gray-600">Analyzing text for hate speech...</p>
-        <p className="text-sm text-gray-500 mt-2">
-          This may take a few moments
-        </p>
-      </div>;
-  }
-  if (!analysisResult) {
-    return <div className="bg-white p-6 rounded-lg shadow-md h-full flex flex-col items-center justify-center text-center">
-        <div className="text-gray-400 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+  if (!prediction) return null;
+  
+  const renderResultBanner = () => {
+    switch (predictionResult) {
+      case 'not-hate':
+        return (
+          <div className="flex items-center gap-2 bg-hatedetector-success/20 text-hatedetector-success p-3 rounded-md font-medium">
+            <Check className="w-5 h-5" />
+            <span>Not Hate Speech</span>
+            <span className="ml-auto text-sm">Confidence: {Math.round((1 - prediction.probability) * 100)}%</span>
+          </div>
+        );
+      case 'possible-hate':
+        return (
+          <div className="flex items-center gap-2 bg-hatedetector-warning/20 text-hatedetector-warning p-3 rounded-md font-medium">
+            <AlertTriangle className="w-5 h-5" />
+            <span>Possibly Hate Speech</span>
+            <span className="ml-auto text-sm">Confidence: {Math.round(prediction.probability * 100)}%</span>
+          </div>
+        );
+      case 'likely-hate':
+        return (
+          <div className="flex items-center gap-2 bg-hatedetector-error/20 text-hatedetector-error p-3 rounded-md font-medium">
+            <X className="w-5 h-5" />
+            <span>Likely Hate Speech</span>
+            <span className="ml-auto text-sm">Confidence: {Math.round(prediction.probability * 100)}%</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+  
+  const renderHighlightedText = () => {
+    const words = prediction.text.split(/(\s+)/);
+    const textWithHighlights = words.map((word, index) => {
+      if (word.trim() === '') return word;
+      
+      const token = prediction.explanation.find(t => t.token === word);
+      
+      if (!token || !token.highlight) {
+        return <span key={index}>{word}</span>;
+      }
+      
+      const score = token.enhanced_attribution;
+      let bgColor;
+      
+      if (score > 0.7) {
+        bgColor = "bg-hatedetector-highlight-high/30";
+      } else if (score > 0.4) {
+        bgColor = "bg-hatedetector-highlight-medium/30";
+      } else {
+        bgColor = "bg-hatedetector-highlight-low/30";
+      }
+      
+      return (
+        <TooltipProvider key={index}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`${bgColor} px-0.5 rounded`}>{word}</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">
+                <p className="font-semibold">Attribution Score: {score.toFixed(2)}</p>
+                <p>Raw Score: {token.raw_attribution.toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {score > 0.7 ? 'High' : score > 0.4 ? 'Medium' : 'Low'} contribution to prediction
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    });
+    
+    return <div className="text-gray-800 leading-relaxed">{textWithHighlights}</div>;
+  };
+  
+  const renderTopContributors = () => {
+    // Sort by enhanced attribution score
+    const sortedTokens = [...prediction.explanation]
+      .filter(token => token.highlight)
+      .sort((a, b) => b.enhanced_attribution - a.enhanced_attribution)
+      .slice(0, 10);
+    
+    if (sortedTokens.length === 0) {
+      return (
+        <div className="text-gray-500 italic mt-2">
+          No significant contributing factors detected.
         </div>
-        <h3 className="text-xl font-medium text-gray-700">
-          No Analysis Results
-        </h3>
-        <p className="mt-2 text-gray-500">
-          Enter text and click "Detect Hate Speech" to analyze.
-        </p>
-      </div>;
-  }
-  return <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">
-          Analysis Results
-        </h2>
-        <p className="text-sm text-gray-600">
-          Our system has analyzed your text and identified the following:
-        </p>
-      </div>
-      <PredictionSummary isHateSpeech={analysisResult.isHateSpeech} confidenceScore={analysisResult.confidenceScore} />
-      <div className="mt-6">
-        <h3 className="text-lg font-medium text-gray-700 mb-2">
-          Text Analysis
-        </h3>
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <TextHighlighter text={analysisResult.text} attributions={analysisResult.wordAttributions} />
+      );
+    }
+    
+    return (
+      <div className="mt-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Top Contributing Factors:</h3>
+        <div className="grid grid-cols-1 gap-2">
+          {sortedTokens.map((token, index) => (
+            <div key={index} className="flex items-center">
+              <span className="text-sm mr-2">{token.token}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-2">
+                <div 
+                  className={`h-full rounded-full ${
+                    token.enhanced_attribution > 0.7 
+                      ? "bg-hatedetector-highlight-high" 
+                      : token.enhanced_attribution > 0.4 
+                        ? "bg-hatedetector-highlight-medium"
+                        : "bg-hatedetector-highlight-low"
+                  }`}
+                  style={{ width: `${Math.min(100, token.enhanced_attribution * 100)}%` }}
+                ></div>
+              </div>
+              <span className="text-xs ml-2 w-12 text-right">{(token.enhanced_attribution * 100).toFixed(0)}%</span>
+            </div>
+          ))}
         </div>
       </div>
-      <div className="mt-6">
-        <AttributionBreakdown attributions={analysisResult.wordAttributions} />
+    );
+  };
+  
+  const renderFeedbackSection = () => {
+    if (feedbackSubmitted) {
+      return (
+        <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md text-center animate-fade-in">
+          <Check className="inline-block w-5 h-5 mr-2" />
+          Thank you for your feedback! It helps improve our model.
+        </div>
+      );
+    }
+    
+    return (
+      <div className="mt-4 border-t pt-4">
+        <div className="flex flex-col">
+          <h3 className="text-sm font-semibold text-center mb-3">Was this prediction correct?</h3>
+          <div className="flex justify-center gap-3">
+            <Button 
+              variant="outline" 
+              className="border-green-500 text-green-700 hover:bg-green-50"
+              onClick={() => onProvideFeedback(true)}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Yes
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-red-500 text-red-700 hover:bg-red-50"
+              onClick={() => onProvideFeedback(false)}
+            >
+              <X className="mr-2 h-4 w-4" />
+              No
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="text-gray-500"
+              onClick={onSkipFeedback}
+            >
+              Skip
+            </Button>
+          </div>
+        </div>
       </div>
-      <div className="mt-6 text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
-        <h4 className="font-medium text-gray-700 mb-2">About This Analysis</h4>
-        <p className="mb-2">
-          This tool uses an AI model to detect potential hate speech. The
-          highlighted words show which parts of the text contributed most to the
-          detection.
-        </p>
-        <p>
-          <strong>Disclaimer:</strong> AI models have limitations and may not
-          always be accurate. This analysis should be used as a guide, not as
-          definitive judgment.
-        </p>
-      </div>
-    </div>;
+    );
+  };
+  
+  return (
+    <Card className="w-full animate-fade-in">
+      <CardHeader className="px-4 py-3">
+        {renderResultBanner()}
+        <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
+          <div className="flex items-center">
+            <Info className="w-3 h-3 mr-1" />
+            <span>ID: {prediction.prediction_id}</span>
+          </div>
+          <div>
+            Analysis completed {new Date().toLocaleTimeString()}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+            Highlighted Text
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 ml-1 text-gray-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs max-w-xs">
+                    Highlighted words show their contribution to the hate speech prediction.
+                    Colors range from yellow (low) to red (high impact).
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </h3>
+          <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+            {renderHighlightedText()}
+          </div>
+        </div>
+        
+        {renderTopContributors()}
+        
+        <div className="bg-blue-50 p-3 rounded-md text-sm text-gray-700">
+          <p className="font-semibold text-blue-800">About this analysis:</p>
+          <p className="mt-1">
+            This tool uses machine learning to identify potential hate speech. 
+            The highlighted words show which parts of the text contributed most to the prediction.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Note: This is an automated analysis and may not always be accurate.
+            Your feedback helps improve the model.
+          </p>
+        </div>
+        
+        {renderFeedbackSection()}
+      </CardContent>
+    </Card>
+  );
 };
+
+export default OutputPanel;
