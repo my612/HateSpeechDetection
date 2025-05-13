@@ -51,90 +51,6 @@ with open(BEST_THRESHOLD, "r") as f:
     threshold = json.load(f)
 
 
-# Model instantiation (match code train args order)
-def get_model():
-    model = HateSpeechDetectorFNN(
-        vocab_size=params["vocab_size"],
-        embed_dim=params["embed_dim"],
-        hid_dim=params["hid_dim"],
-        output_dim=1,  # assume binary
-        pad_idx=params["pad_idx"],
-        max_seq_length=params["max_seq_length"],
-    )
-    model.load_state_dict(torch.load(str(MODEL_WEIGHTS), map_location="cpu"))
-    model.eval()
-    return model
-
-
-model = get_model()  # global model instance
-
-
-# %%
-def preprocess_input(text, word_to_index, max_seq_length=100):
-    i, tokens, original_tokens, position_mapping = InferenceDataPipeline(
-        text, word_to_index, max_seq_length)
-    indices = [word_to_index.get(tok, word_to_index["<UNK>"]) for tok in tokens]
-    # Pad or truncate
-    if len(indices) < max_seq_length:
-        indices += [word_to_index["<PAD>"]] * (max_seq_length - len(indices))
-    else:
-        indices = indices[:max_seq_length]
-    tensor_input = torch.tensor([indices], dtype=torch.long)  # shape (1, 100)
-    return tensor_input, tokens, original_tokens, position_mapping
-
-
-# %%
-
-
-def compute_token_saliency(model, input_indices, vocab, device="cpu"):
-    # input_indices: (seq_len,) torch.LongTensor
-    # vocab: your index to word (or word to index)
-
-    model.eval()
-    input_indices = input_indices.unsqueeze(0).to(device)  # (1, seq_len)
-    # Enable grad on embeddings for THIS sample
-    embedding_layer = model.embedding
-    embedding_layer.weight.requires_grad = True
-
-    # Forward
-    output_logits = model(input_indices)  # (1, 1) shape
-    logit = output_logits.squeeze()  # scalar
-
-    # Backward wrt logit
-    model.zero_grad()
-    logit.backward()
-
-    # Now embedding_layer.weight.grad is (vocab_size, emb_dim)
-    # But we want the grad for **just the tokens in this input**
-    input_tokens = input_indices[0]  # (seq_len,)
-
-    # For each position, get grad for embedding of that token
-    grads = embedding_layer.weight.grad  # (vocab_size, emb_dim)
-
-    # For each position in seq, select grad row corresponding to index at that pos
-    saliency = []
-    index_to_word = {idx: word for word, idx in vocab.items()}
-    for idx in input_tokens:
-        idx = idx.item()
-        token_grad = grads[idx]  # (emb_dim,)
-        sal_score = token_grad.abs().sum().item()
-        tok = index_to_word.get(idx, "<UNK>")
-        saliency.append({"text": tok, "saliency": sal_score})
-
-    # Normalize saliency to [0,1] across input tokens
-    sal_values = [s["saliency"] for s in saliency]
-    max_sal = max(sal_values) if max(sal_values) > 0 else 1.0
-    min_sal = min(sal_values)
-    for s in saliency:
-        s["saliency"] = (
-            (s["saliency"] - min_sal) / (max_sal - min_sal)
-            if max_sal > min_sal
-            else 0.0
-        )
-
-    return saliency
-
-
 def integrated_gradients(
     model,
     input_indices,  # Tensor: shape (1, seq_len)
@@ -212,38 +128,8 @@ def integrated_gradients(
     return result
 
 
-def predict_from_tensor(input_tensor):
-    """input_tensor: torch (1, max_seq_length, dtype=long)"""
-    with torch.no_grad():
-        logits = model(input_tensor)
-        prob = torch.sigmoid(logits).item()  # scalar
-        label = prob >= threshold["best_threshold"]
-    return label, prob
-
 
 # %%
 test_case = "Islam and ISIS should go to hell. All Muslims should be immediately sent to their country, because they are all intolerant criminals. If we do so, Britain will be a safer place."
-ten_i, tokens, original_tokens, position_mapping = preprocess_input(
-    test_case, word_to_index=word_to_index
-)
 
 
-def predict(text):
-    ten_i, tokens, original_tokens, position_mapping = preprocess_input(text, word_to_index=word_to_index)
-    label, prob = predict_from_tensor(ten_i)
-    return {"label": label, "prob": prob, "tokens": tokens}
-
-
-def explain(text):
-    # Preprocess
-    input_tensor, tokens, original_tokens, position_mapping = preprocess_input(
-        text, word_to_index, max_seq_length=100
-    )  # (1, seq_len)
-    attributions = integrated_gradients(
-        model, input_tensor, word_to_index, device=device
-    )
-
-    tokens = [a["text"] for a in attributions]
-    attributions = [a["attribution"] for a in attributions]
-    result = get_explanation(tokens, attributions)
-    return result, original_tokens
