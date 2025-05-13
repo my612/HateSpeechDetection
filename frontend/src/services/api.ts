@@ -61,6 +61,7 @@ export const submitFeedback = async (
   }
 };
 
+// Skip feedback API
 export const skipFeedback = async (
   predictionId: string
 ): Promise<FeedbackResponse> => {
@@ -86,6 +87,7 @@ export const skipFeedback = async (
     throw error;
   }
 };
+
 // Get next feedback item API
 export const getNextFeedbackItem = async (): Promise<FeedbackQueueItem | null> => {
   console.log("Requesting next feedback item");
