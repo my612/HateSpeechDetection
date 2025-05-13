@@ -1,0 +1,9 @@
+./backend/req_gen.py
+./backend/venv
+./backend/NN_LSTM.py
+./backend/__pycache__
+./backend/app/__pycache__/
+./backend/artifacts/NN_vM9_2.py
+./backend/artifacts/old_model_params
+./backend/artifacts/NN-focal-loss.py
+./frontend/node_modules
